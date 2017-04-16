@@ -15,7 +15,7 @@ of the model car.*/
 #include <netinet/in.h>
 #include <errno.h> 
 
-
+/* test 1*/
 
 //declare functions
 /* Motion of the RC car will be control via the acceleromter data from 
