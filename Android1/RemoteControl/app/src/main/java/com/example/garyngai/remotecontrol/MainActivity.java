@@ -26,22 +26,29 @@ import java.net.SocketException;
 import java.net.NetworkInterface;
 import java.util.Enumeration;
 
+
+
 public class MainActivity extends AppCompatActivity implements SensorEventListener{
 
     private SensorManager sensorManager;
     private Sensor Acc_sensor;
+
     TextView TextView_AccData, TextView_Display, TargetIpAddress,PORTTextView,ClientIPAddressTextView;
     Button  Connect, ModeSwitch, ONandStopSwitch, Submit;
     EditText PORT,ClientIPAddress, XPosition, YPosition;
 
-    private int DataPackage;
+    private byte[] DataPackage;
 
     Handler updateTextViewDisplayHandler;
     UdpServerThread udpServerThread;
 
     private static final String TAG = "debug";
+    private float AccThreshold = 1.0f;
 
-    boolean WriteDataSwitch =false;
+
+    final byte OnOffSwitch = 0b00000001;
+    final byte AutoRemoteSwitch = 0b00000010;
+    final byte SubmitXYSwitch = 0b00000100;
 
 
     @Override
@@ -66,16 +73,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         PORTTextView            = (TextView) findViewById(R.id.PORTTextView);
         ClientIPAddressTextView = (TextView) findViewById(R.id.ClientIPAddressTextView);
 
+
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         Acc_sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
-        sensorManager.unregisterListener(this,Acc_sensor);
-        
-
-        //sensorManager.registerListener(this, Acc_sensor,SensorManager.SENSOR_DELAY_NORMAL);
-
-
-
+        DataPackage = new byte[5];
 
         updateTextViewDisplayHandler = new Handler();
 
@@ -88,23 +90,39 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     protected void onStart(){
         super.onStart();
-        sensorManager.unregisterListener(this);
+
     }
 
     @Override
     protected void onResume(){
         super.onResume();
-        sensorManager.registerListener(this, Acc_sensor, SensorManager.SENSOR_DELAY_NORMAL);
-        PORT.setFocusableInTouchMode(true);
+
+        sensorManager.unregisterListener(this);
+
+        DisableAllButton();
+        PORT.setFocusable(true);
+        PORT.setEnabled(true);
+        ClientIPAddress.setFocusable(true);
+        ClientIPAddress.setEnabled(true);
+        TextView_AccData.setText("AccData");
+        Connect.setText("Connect");
+
 
     }
 
     @Override
     protected void onPause() {
-        // unregister listener
+
         super.onPause();
         sensorManager.unregisterListener(this);
-        PORT.setFocusableInTouchMode(true);
+        DisableAllButton();
+        if(udpServerThread != null)
+        {
+            DataPackageReset();
+            udpServerThread.kill();
+            udpServerThread = null;
+        }
+
 
     }
 
@@ -112,16 +130,24 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     protected void onStop(){
         super.onStop();
 
-        if(udpServerThread != null){
-            udpServerThread.setRunning(false);
+        if(udpServerThread != null)
+        {
+            DataPackageReset();
+            udpServerThread.kill();
             udpServerThread = null;
         }
+
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
+        if(udpServerThread != null)
+        {
+            DataPackageReset();
+            udpServerThread.kill();
+            udpServerThread = null;
+        }
 
     }
 
@@ -137,19 +163,53 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private void getAccelerometer(SensorEvent event) {
         float[] values = event.values;
+
         // Save the values from the three axes into their corresponding variables
         float x = values[0];
         float y = values[1];
         float z = values[2];
 
-        // TODO: Set DataBuffer
-        // TODO: Send to RPI
+        byte Xlevel = 0;
+        byte Ylevel = 0;
 
-        TextView_AccData.setText("AccData = " + String.format("%.02f", x) + "," + String.format("%.02f", y) + "," + String.format("%.02f", z));
-        //String dString = "123\n";
+        // Determine X speed level
+        if(Math.abs(x) <= AccThreshold )
+        {
+            Xlevel = 0;
+        }
+        else
+        {
+            double speedX = (Math.abs(x) - AccThreshold) / 0.881;
+            speedX = Math.ceil(speedX);
+            Xlevel = (byte) ( speedX * Math.copySign(1,x)  );
+
+        }
+
+       // Determine Y speed Level
+        if(Math.abs(y) <= AccThreshold)
+        {
+            Ylevel = 0;
+        }
+        else
+        {
+            double speedY = (Math.abs(y) - AccThreshold) / 0.881;
+            speedY = Math.ceil(speedY);
+            Ylevel = (byte) ( speedY * Math.copySign(1,y) );
+        }
+
+
+        TextView_AccData.setText( "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
+//        TextView_AccData.setText("(" + String.format("%.02f", x) + "," + String.format("%.02f", y) + ")"
+//                + "(" + String.valueOf(Xlevel) + "," + String.valueOf(Ylevel) + ")");
+
+        // TODO: Set DataBuffer
+        DataPackage[1] = Xlevel;
+        DataPackage[2] = Ylevel;
+
+        //TextView_AccData.setText("AccData = " + String.format("%.02f", x) + "," + String.format("%.02f", y) + "," + String.format("%.02f", z));
+        //String dString = "1234\n";
         //udpServerThread.setBuf(dString.getBytes());
-        //udpServerThread.setWriteDataSwitch(true);
-        //udpServerThread.setWriteDataSwitch(false);
+
     }
 
     @Override
@@ -163,12 +223,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     {
 
         updateTextViewDisplayHandler.post(new UpdateUIThread("Connecting..."));
-        udpServerThread = new UdpServerThread(Integer.parseInt(PORT.getText().toString()), ClientIPAddress.getText().toString() );
 
 
+        // Connected
         if (Connect.getText().equals("Connect")) {
-
-
+            udpServerThread = new UdpServerThread(Integer.parseInt(PORT.getText().toString()), ClientIPAddress.getText().toString() );
+            DataPackageReset();
+            TextView_AccData.setText( "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
             udpServerThread.start();
 
 
@@ -188,6 +249,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
         }
+        // Not Connected
         else if (Connect.getText().equals("Disconnect"))
         {
             DisableAllButton();
@@ -200,7 +262,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             ONandStopSwitch.setText("ON");
             ModeSwitch.setText("Auto Mode");
 
-            udpServerThread.setRunning(false);
+            DataPackageReset();
+            TextView_AccData.setText( "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
+            udpServerThread.kill();
             updateTextViewDisplayHandler.post(new UpdateUIThread("UDP Disconnected"));
 
         }
@@ -220,6 +284,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             YPosition.setEnabled(true);
             ONandStopSwitch.setEnabled(false);
             Submit.setEnabled(true);
+            DataPackage[0] |= AutoRemoteSwitch;
+            DataPackage[1] = (byte) 0;
+            DataPackage[2] = (byte) 0;
+            TextView_AccData.setText( "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
+
         }
         else if(ModeSwitch.getText().equals("Remote Mode"))
         {
@@ -229,7 +298,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             YPosition.setEnabled(false);
             Submit.setEnabled(false);
             ONandStopSwitch.setEnabled(true);
-
+            DataPackage[0] ^= AutoRemoteSwitch;
+            TextView_AccData.setText( "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
         }
     }
 
@@ -246,6 +316,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 ONandStopSwitch.setEnabled(true);
                 ONandStopSwitch.setText("OFF");
                 sensorManager.registerListener(this, Acc_sensor, SensorManager.SENSOR_DELAY_NORMAL);
+                DataPackage[0] |= OnOffSwitch;
+                TextView_AccData.setText( "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
 
 
             }
@@ -257,45 +329,46 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                 sensorManager.unregisterListener(this);
                 TextView_AccData.setText("Acc Sensor OFF");
+
+                DataPackage[0] ^= OnOffSwitch;
+                DataPackage[1] = (byte) 0;
+                DataPackage[2] = (byte) 0;
+                TextView_AccData.setText( "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
+
             }
         }
         else if(ModeSwitch.getText().equals("Remote Mode"))
         {
             // @ Auto Mode
-            XPosition.setEnabled(true);
-            YPosition.setEnabled(true);
-            Submit.setEnabled(true);
-            ModeSwitch.setEnabled(true);
-            ONandStopSwitch.setText("ON");
-
-
+                // Turn off and back to Remote OFF state
+                //XPosition.setEnabled(true);
+                //YPosition.setEnabled(true);
+                //Submit.setEnabled(true);
+                ModeSwitch.setEnabled(true);
+                ModeSwitch.setText("Auto Mode");
+                ONandStopSwitch.setText("ON");
+                DataPackage[0] ^= OnOffSwitch | SubmitXYSwitch | AutoRemoteSwitch;
+                DataPackage[3] = (byte) 0;
+                DataPackage[4] = (byte) 0;
+                TextView_AccData.setText( "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
 
         }
-            // TODO: Remote mode
-                // TODO: check if ON
-                    // TODO: Turn on the ACC sensor
-                    // TODO: set ONandStopSwitch.settext("OFF")
 
-                // TODO: check if OFF
-                    // TODO: Turn off the ACC sensor
-                    // TODO: set ONandStopSwitch.settext("ON")
-
-
-        // TODO: set DataBuffer the stop command
-        // TODO: send to RPI
-
-        // TODO: Check if Auto mode
     }
 
     public void Submit( View view)
     {
+        String x = XPosition.getText().toString();
+        String y = YPosition.getText().toString();
+
+        DataPackage[0] |= SubmitXYSwitch | OnOffSwitch;
+        DataPackage[3] = Byte.valueOf(x);
+        DataPackage[4] = Byte.valueOf(y);
+        TextView_AccData.setText( "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
+
         DisableAllButton();
         ONandStopSwitch.setEnabled(true);
         ONandStopSwitch.setText("OFF");
-
-        // TODO: write (X,Y) to DataBuffer
-        // TODO: Send to RPI
-        // TODO: Disable Submit Buttom
     }
 
     //Thread
@@ -315,42 +388,60 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
 
-    private class UdpServerThread extends Thread{
+    private class UdpServerThread extends Thread
+    {
 
         int serverPort;
         String IPaddress;
         DatagramSocket socket;
+        DatagramPacket packet;
+
 
         byte[] buf;
-        boolean running, WriteDataSwitch;
+        boolean running;
 
-        public UdpServerThread(int serverPort , String IPaddress) {
+        public UdpServerThread()
+        {
+            super();
+            this.buf = new byte[5];
+            System.out.println("UDP server Thread created ");
+            this.running = true;
+
+        }
+
+        public UdpServerThread(int serverPort , String IPaddress)
+        {
             super();
             this.serverPort = serverPort;
             this.IPaddress = IPaddress;
-            this.buf = new byte[4];
-            this.WriteDataSwitch = false;
-            System.out.println("UDP server Thread created ");
+            this.buf = new byte[5];
+            this.running = true;
+
         }
 
-        public void setRunning(boolean running){
-            this.running = running;
+        public void kill(){
+            this.running = false;
         }
-
-
-        public void setBuf(byte[] buf) {
+        public void setBuf(byte[] buf)
+        {
             this.buf = buf;
 
         }
-
-        public void setWriteDataSwitch(boolean WriteDataSwitch) {
-            this.WriteDataSwitch = WriteDataSwitch;
+        public void setServerPort(int serverPort)
+        {
+            this.serverPort = serverPort;
+        }
+        public void setIPaddress(String IPaddress)
+        {
+            this.IPaddress = IPaddress;
         }
 
-        @Override
-        public void run() {
 
-            running = true;
+        @Override
+        public void run()
+        {
+
+
 
             try
             {
@@ -364,28 +455,27 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                 socket.connect(address.getAddress(), this.serverPort);
 
-                while(running) {
 
+                while(running)
+                {
 
-                    if(this.WriteDataSwitch)
+                    DatagramPacket packet = new DatagramPacket(DataPackage,DataPackage.length);
+                    socket.send(packet);
+
+                    // Sleep thread
+                    try
                     {
 
-                        /*
-                        String dString = "LOL\n";
-                        buf = dString.getBytes();
-                        */
-
-                        DatagramPacket packet = new DatagramPacket(buf, buf.length);
-
-                        socket.send(packet);
-
+                        this.sleep(100);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
                     }
 
+
+
                 }
-            }
-            catch (SocketException e)
-            {
-                e.printStackTrace();
             }
             catch (IOException e)
             {
@@ -393,11 +483,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
             finally
             {
-
+                if(socket !=null)
+                {
                     socket.close();
                 }
             }
+
+
         }
+    }
 
 
 
@@ -444,5 +538,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         XPosition.setEnabled(false);
         YPosition.setEnabled(false);
         Submit.setEnabled(false);
+    }
+    private void DataPackageReset()
+    {
+        DataPackage[0] = (byte) 0;
+        DataPackage[1] = (byte) 0;
+        DataPackage[2] = (byte) 0;
+        DataPackage[3] = (byte) 0;
+        DataPackage[4] = (byte) 0;
     }
 }
