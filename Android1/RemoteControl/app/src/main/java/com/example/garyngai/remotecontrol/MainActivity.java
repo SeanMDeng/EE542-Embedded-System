@@ -5,13 +5,11 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorManager;
 import android.hardware.SensorEventListener;
 import android.os.Handler;
-import android.provider.ContactsContract;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.support.v7.app.ActionBarActivity;
 import android.app.Activity;
@@ -20,15 +18,15 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.DatagramSocket;
-import java.net.DatagramPacket;
-import java.net.SocketAddress;
+import java.net.DatagramPacket;;
 import java.net.SocketException;
 import java.net.NetworkInterface;
 import java.util.Enumeration;
 
 
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener{
+public class MainActivity extends AppCompatActivity implements SensorEventListener
+{
 
     private SensorManager sensorManager;
     private Sensor Acc_sensor;
@@ -42,7 +40,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     Handler updateTextViewDisplayHandler;
     UdpServerThread udpServerThread;
 
-    private static final String TAG = "debug";
     private float AccThreshold = 1.0f;
 
 
@@ -56,6 +53,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // Craete Interface
         TextView_AccData        = (TextView) findViewById(R.id.AccDataDisplay);
         TextView_Display        = (TextView) findViewById(R.id.CommandDisplay);
         TargetIpAddress         = (TextView) findViewById(R.id.TargetIPAddress);
@@ -73,7 +71,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         PORTTextView            = (TextView) findViewById(R.id.PORTTextView);
         ClientIPAddressTextView = (TextView) findViewById(R.id.ClientIPAddressTextView);
 
-
+        // Get Accelerometer Sensor
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         Acc_sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
@@ -83,6 +81,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         DisableAllButton();
 
+        // Get Phone IP address
         TargetIpAddress.setText( GetIpAddress() );
 
     }
@@ -181,6 +180,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         {
             double speedX = (Math.abs(x) - AccThreshold) / 0.881;
             speedX = Math.ceil(speedX);
+
+            // X Saturation
+            if(speedX > 10)
+            {
+                speedX = 10;
+            }
+
             Xlevel = (byte) ( speedX * Math.copySign(1,x)  );
 
         }
@@ -194,21 +200,23 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         {
             double speedY = (Math.abs(y) - AccThreshold) / 0.881;
             speedY = Math.ceil(speedY);
+
+            // Y Saturation
+            if(speedY > 10)
+            {
+                speedY = 10;
+            }
             Ylevel = (byte) ( speedY * Math.copySign(1,y) );
         }
 
 
-        TextView_AccData.setText( "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
-//        TextView_AccData.setText("(" + String.format("%.02f", x) + "," + String.format("%.02f", y) + ")"
-//                + "(" + String.valueOf(Xlevel) + "," + String.valueOf(Ylevel) + ")");
+        TextView_AccData.setText( "(" + String.format("%.02f", x) + "," + String.format("%.02f", y) + ")"
+                + "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
 
-        // TODO: Set DataBuffer
+        // Set DataBuffer
         DataPackage[1] = Xlevel;
         DataPackage[2] = Ylevel;
 
-        //TextView_AccData.setText("AccData = " + String.format("%.02f", x) + "," + String.format("%.02f", y) + "," + String.format("%.02f", z));
-        //String dString = "1234\n";
-        //udpServerThread.setBuf(dString.getBytes());
 
     }
 
@@ -242,11 +250,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             ONandStopSwitch.setEnabled(true);
             ModeSwitch.setEnabled(true);
 
-
-
             Connect.setText("Disconnect");
-
-
 
         }
         // Not Connected
@@ -262,7 +266,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             ONandStopSwitch.setText("ON");
             ModeSwitch.setText("Auto Mode");
 
+            sensorManager.unregisterListener(this);
             DataPackageReset();
+            
             TextView_AccData.setText( "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
             udpServerThread.kill();
             updateTextViewDisplayHandler.post(new UpdateUIThread("UDP Disconnected"));
@@ -272,9 +278,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     public void SwitchMode(View view)
     {
-        // TODO: set DataBuffer the stop command
-        // TODO: send to RPI
-
+        // Auto Mode
         if(ModeSwitch.getText().equals("Auto Mode"))
         {
             sensorManager.unregisterListener(this);
@@ -290,6 +294,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             TextView_AccData.setText( "(" + DataPackage[0] + ", "+ DataPackage[1] + ", "+ DataPackage[2] + ", " + DataPackage[3] + "," + DataPackage[4] + ")");
 
         }
+        // Remote Mode
         else if(ModeSwitch.getText().equals("Remote Mode"))
         {
 
@@ -305,7 +310,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     public void ONandStopSwitch(View view)
     {
-        // TODO: check if Auto or Remote mode
+        // Check if Auto or Remote mode
         if(ModeSwitch.getText().equals("Auto Mode"))
         {
             // @ Remote Mode
@@ -337,13 +342,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             }
         }
+
         else if(ModeSwitch.getText().equals("Remote Mode"))
         {
-            // @ Auto Mode
-                // Turn off and back to Remote OFF state
-                //XPosition.setEnabled(true);
-                //YPosition.setEnabled(true);
-                //Submit.setEnabled(true);
+                // @ Auto Mode
                 ModeSwitch.setEnabled(true);
                 ModeSwitch.setText("Auto Mode");
                 ONandStopSwitch.setText("ON");
@@ -394,7 +396,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         int serverPort;
         String IPaddress;
         DatagramSocket socket;
-        DatagramPacket packet;
+        //DatagramPacket packet;
 
 
         byte[] buf;
@@ -422,8 +424,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void kill(){
             this.running = false;
         }
-        public void setBuf(byte[] buf)
-        {
+        public void setBuf(byte[] buf) {
             this.buf = buf;
 
         }
