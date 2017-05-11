@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools" android:layout_width="match_parent"
+    android:layout_height="match_parent" android:paddingLeft="@dimen/activity_horizontal_margin"
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    android:paddingTop="@dimen/activity_vertical_margin"
+    android:paddingBottom="@dimen/activity_vertical_margin" tools:context=".MainActivity">
+
+    <TextView android:text="Command" android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/CommandDisplay"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginEnd="13dp"
+        android:layout_marginBottom="11dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="AccData"
+        android:id="@+id/AccDataDisplay"
+        android:layout_above="@+id/CommandDisplay"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="35dp" />
+
+    <Button
+        android:id="@+id/Connect"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Connect"
+        android:onClick="Connect"
+        android:clickable="true"
+        android:layout_alignBaseline="@+id/PORT"
+        android:layout_alignBottom="@+id/PORT"
+        android:layout_alignEnd="@+id/CommandDisplay"
+        android:layout_marginEnd="28dp" />
+
+    <EditText
+        android:id="@+id/PORT"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ems="10"
+        android:inputType="number"
+        android:text="5555"
+        android:layout_alignTop="@+id/PORTTextView"
+        android:layout_alignStart="@+id/ClientIPAddress" />
+
+    <TextView
+        android:id="@+id/TargetIPAddress"
+        android:layout_width="match_parent"
+        android:layout_height="14dp"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:filterTouchesWhenObscured="false"
+        android:text="Target IP Address is"
+        android:textSize="14sp" />
+
+    <EditText
+        android:id="@+id/ClientIPAddress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/TargetIPAddress"
+        android:layout_toEndOf="@+id/ClientIPAddressTextView"
+        android:ems="10"
+        android:inputType="number"
+        android:text="192.168.1.9"
+        android:textSize="24sp" />
+
+    <TextView
+        android:id="@+id/PORTTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:filterTouchesWhenObscured="false"
+        android:text="PORT"
+        android:textSize="24sp"
+        android:layout_marginStart="51dp"
+        android:layout_below="@+id/ClientIPAddress"
+        android:layout_alignParentStart="true"
+        android:layout_marginTop="7dp" />
+
+    <TextView
+        android:id="@+id/ClientIPAddressTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_below="@+id/TargetIPAddress"
+        android:text="Client IP Address"
+        android:textSize="24sp" />
+
+    <Button
+        android:id="@+id/ModeSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true"
+        android:text="Auto Mode"
+        android:onClick="SwitchMode"/>
+
+</RelativeLayout>
